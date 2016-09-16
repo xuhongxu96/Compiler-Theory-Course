@@ -35,8 +35,8 @@ enum LexerState {
 
 enum ErrorType {
     NO_ERROR, NOT_A_DIGIT, NOT_A_HEX_DIGIT, EOF_ERR, INVALID_HEX_NUMBER,
-    BEGIN_WITH_ZERO, NO_POINT_IN_FLOAT, INVALID_FLOAT, INVALID_EXPONENT,
-    INVALID_ID_BEGIN, UNDEFINED_IDENTIFIER
+    BEGIN_WITH_ZERO, INVALID_FLOAT, INVALID_EXPONENT, UNEXPECTED_TOKEN,
+    INVALID_NUMBER
 };
 
 struct Lexer {
@@ -239,20 +239,17 @@ void error(struct Lexer *lexer, enum ErrorType err) {
         case BEGIN_WITH_ZERO:
             printf("err: decimal number begins with zero. pos: %lld\n", pos);
             break;
-        case NO_POINT_IN_FLOAT:
-            printf("err: missing point in float. pos: %lld\n", pos);
-            break;
         case INVALID_FLOAT:
             printf("err: invalid float (missing integer or decimal part). pos: %lld\n", pos);
             break;
         case INVALID_EXPONENT:
             printf("err: invalid exponent (missing number after 'E'). pos: %lld\n", pos);
             break;
-        case INVALID_ID_BEGIN:
-            printf("err: invalid identifier (can only start with _ or alpha). pos: %lld\n", pos);
+        case INVALID_NUMBER:
+            printf("err: invalid number. pos: %lld\n", pos);
             break;
-        case UNDEFINED_IDENTIFIER:
-            printf("err: undefined identifier. pos: %lld\n", pos);
+        case UNEXPECTED_TOKEN:
+            printf("err: unexpected token. pos: %lld\n", pos);
             break;
     }
     printf(">>> err ch: %d - %c\n", lexer->ch, lexer->ch);
@@ -292,7 +289,8 @@ bool eatInt(struct Lexer *lexer, struct TokenInfo *info) {
         hasNumber = true;
         if (err != NO_ERROR) {
             error(lexer, err);
-            return false;
+            eatToSpace(lexer);
+            return true;
         }
         res *= base;
         res += n;
@@ -311,7 +309,8 @@ bool eatInt(struct Lexer *lexer, struct TokenInfo *info) {
     } else if (base == 16) {
         // found 0x but no other digits
         error(lexer, INVALID_HEX_NUMBER);
-        return false;
+        eatToSpace(lexer);
+        return true;
     }
     return false;
 }
@@ -325,6 +324,10 @@ bool eatFloat(struct Lexer *lexer, struct TokenInfo *info) {
     int integer = 0;
     bool hasInteger = false;
     bool hasDecimal = false;
+    bool hasPoint = false;
+
+    float decimal = 0.0f;
+    int d = 0;
 
     savePos(lexer);
     while (eatDigit(lexer)) {
@@ -334,7 +337,8 @@ bool eatFloat(struct Lexer *lexer, struct TokenInfo *info) {
 
         if ((err = char2int(lexer->ch, &n)) != NO_ERROR) {
             error(lexer, err);
-            return false;
+            eatToSpace(lexer);
+            return true;
         }
 
         integer *= 10;
@@ -349,26 +353,27 @@ bool eatFloat(struct Lexer *lexer, struct TokenInfo *info) {
 #ifdef _DEBUG_
     outputPos(lexer);
 #endif
-        return false;
-    }
+        // return false;
+    } else {
 
-    float decimal = 0.0f;
-    int d = 0;
-
-    while (eatDigit(lexer)) {
-        hasDecimal = true;
-        int n;
-        int err;
-        if ((err = char2int(lexer->ch, &n)) != NO_ERROR) {
-            error(lexer, err);
-            return false;
+        hasPoint = true;
+        while (eatDigit(lexer)) {
+            hasDecimal = true;
+            int n;
+            int err;
+            if ((err = char2int(lexer->ch, &n)) != NO_ERROR) {
+                error(lexer, err);
+                eatToSpace(lexer);
+                return true;
+            }
+            ++d;
+            decimal *= 10;
+            decimal += n;
         }
-        ++d;
-        decimal *= 10;
-        decimal += n;
-    }
-    for (int i = 0; i < d; ++i) {
-        decimal /= 10;
+        for (int i = 0; i < d; ++i) {
+            decimal /= 10;
+        }
+
     }
 
     if (eatChar(lexer, 'E') || eatChar(lexer, 'e')) {
@@ -390,7 +395,8 @@ bool eatFloat(struct Lexer *lexer, struct TokenInfo *info) {
 
             if ((err = char2int(lexer->ch, &n)) != NO_ERROR) {
                 error(lexer, err);
-                return false;
+                eatToSpace(lexer);
+                return true;
             }
 
             exp *= 10;
@@ -399,7 +405,8 @@ bool eatFloat(struct Lexer *lexer, struct TokenInfo *info) {
 
         if (!hasExp) {
             error(lexer, INVALID_EXPONENT);
-            return false;
+            eatToSpace(lexer);
+            return true;
         }
 
         if (exp == 0) {
@@ -416,9 +423,14 @@ bool eatFloat(struct Lexer *lexer, struct TokenInfo *info) {
             }
         }
     } else {
-        if (!hasInteger || !hasDecimal) {
-            error(lexer, INVALID_FLOAT);
+
+        if (!hasPoint) {
             return false;
+        }
+        if (hasPoint && (!hasInteger || !hasDecimal)) {
+            error(lexer, INVALID_FLOAT);
+            eatToSpace(lexer);
+            return true;
         }
         res = integer + decimal;
     }
@@ -926,7 +938,7 @@ void eatToken(struct Lexer *lexer) {
         } else if (eatInt(lexer, &info)) {
         } else if (eatIdentifier(lexer, &info)) {
         } else {
-            error(lexer, UNDEFINED_IDENTIFIER);
+            error(lexer, UNEXPECTED_TOKEN);
             readChar(lexer);
             continue;
         }
