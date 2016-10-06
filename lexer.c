@@ -8,13 +8,13 @@
 
 enum Token {
     INT, FLOAT, ID, SEMI, COMMA, ASSIGNOP, RELOP, PLUS, MINUS, STAR, DIV, AND, OR,
-    DOT, NOT, TYPE, LP, RP, LB, RB, LC, RC, STRUCT, RETURN, IF, ELSE, WHILE
+    DOT, NOT, TYPE, LP, RP, LB, RB, LC, RC, STRUCT, RETURN, IF, ELSE, WHILE, COMMENT
 };
 
 char *TokenStr[] = {
     "INT", "FLOAT", "ID", "SEMI", "COMMA", "ASSIGNOP", "RELOP", "PLUS",
     "MINUS", "STAR", "DIV", "AND", "OR", "DOT", "NOT", "TYPE", "LP", "RP",
-    "LB", "RB", "LC", "RC", "STRUCT", "RETURN", "IF", "ELSE", "WHILE"
+    "LB", "RB", "LC", "RC", "STRUCT", "RETURN", "IF", "ELSE", "WHILE", "COMMENT"
 };
 
 union TokenVal {
@@ -34,8 +34,8 @@ enum LexerState {
 };
 
 enum ErrorType {
-    NO_ERROR, NOT_A_DIGIT, NOT_A_HEX_DIGIT, EOF_ERR, INVALID_HEX_NUMBER,
-    INVALID_FLOAT, UNEXPECTED_TOKEN
+    NO_ERROR, NOT_A_DIGIT, NOT_A_HEX_DIGIT, EOF_ERR, INVALID_HEX_NUMBER, INVALID_OCT_NUMBER,
+    INVALID_FLOAT, UNEXPECTED_TOKEN, COMMENT_NOT_CLOSED, WRAPPED_COMMENT
 };
 
 struct Lexer {
@@ -44,6 +44,7 @@ struct Lexer {
     char ch;
     fpos_t last_pos;
     bool has_error;
+    long lineno;
 };
 
 void error(struct Lexer *lexer, enum ErrorType err);
@@ -61,13 +62,20 @@ char readChar(struct Lexer *lexer) {
     return lexer->ch;
 }
 
-struct Lexer *createLexer(FILE *fp) {
-    struct Lexer *lexer = (struct Lexer *)malloc(sizeof(struct Lexer));
-    rewind(fp);
-    lexer->fp = fp;
+void resetLexer(struct Lexer *lexer) {
+    rewind(lexer->fp);
     lexer->state = CREATED;
     lexer->last_pos = 0;
     lexer->has_error = false;
+    lexer->lineno = 1;
+}
+
+struct Lexer *createLexer(FILE *fp) {
+    struct Lexer *lexer = (struct Lexer *)malloc(sizeof(struct Lexer));
+    lexer->fp = fp;
+
+    resetLexer(lexer);
+
     return lexer;
 }
 
@@ -192,6 +200,9 @@ bool eatHexDigit(struct Lexer *lexer) {
 bool eatSpace(struct Lexer *lexer) {
     readChar(lexer);
     if (isspace(lexer->ch)) {
+        if (lexer->ch == '\n') {
+            ++lexer->lineno;
+        }
         return true;
     }
     spitChar(lexer);
@@ -208,73 +219,72 @@ int eatSpaces(struct Lexer *lexer) {
 
 void eatToSpace(struct Lexer *lexer) {
     do {
-        readChar(lexer);
+        if (!readChar(lexer)) {
+            break;
+        }
     } while (!isspace(lexer->ch));
     //spitChar(lexer);
 }
 
-void error(struct Lexer *lexer, enum ErrorType err) {
+void eatToNewLine(struct Lexer *lexer) {
+    do {
+        if (!readChar(lexer)) {
+            break;
+        }
+    } while (lexer->ch != '\n');
+    ++lexer->lineno;
+    //spitChar(lexer);
+}
+
+void error_with_lineno(struct Lexer *lexer, enum ErrorType err, long lineno) {
 
     lexer->has_error = true;
 
-    printf(">>> ");
-
     fpos_t pos;
     fgetpos(lexer->fp, &pos);
+
+    if (lineno == -1) {
+        lineno = lexer->lineno;
+    }
 
     switch (err) {
         case NO_ERROR:
             printf("info: no error.");
             break;
         case NOT_A_DIGIT:
-            printf("err: not a digit. pos: %lld.\n", pos);
+            printf("Error type A at line %ld: Not a digit.\n", lineno);
             break;
         case NOT_A_HEX_DIGIT:
-            printf("err: not a hex digit. pos: %lld\n", pos);
+            printf("Error type A at line %ld: Not a hex digit.\n", lineno);
             break;
         case EOF_ERR:
-            printf("err: end of file. pos: %lld\n", pos);
+            printf("Error: end of file.\n");
             break;
         case INVALID_HEX_NUMBER:
-            printf("err: not a valid hex number. pos: %lld\n", pos);
+            printf("Error type A at line %ld: Not a valid hex number.\n", lineno);
+            break;
+        case INVALID_OCT_NUMBER:
+            printf("Error type A at line %ld: Not a valid oct number.\n", lineno);
+            break;
+        case COMMENT_NOT_CLOSED:
+            printf("Error type A at line %ld: Comment not closed.\n", lineno);
+            break;
+        case WRAPPED_COMMENT:
+            printf("Error type A at line %ld: Multi-line comment can't be wrapped.\n", lineno);
             break;
         case INVALID_FLOAT:
-            printf("err: invalid float. pos: %lld\n", pos);
+            printf("Error type A at line %ld: Not a valid float number.\n", lineno);
             break;
         case UNEXPECTED_TOKEN:
-            printf("err: unexpected token. pos: %lld\n", pos);
+            printf("Error type A at line %ld: Mysterious character \"%c\".\n", lineno, lexer->ch);
             break;
     }
 
-    savePos(lexer);
-
-    char buffer[12];
-    buffer[0] = '\0';
-    if (pos >= 10) {
-
-        fseek(lexer->fp, -5, SEEK_CUR);
-        fread(buffer, 1, 4, lexer->fp);
-        buffer[5] = '\0';
-        printf(">>> %s >> ", buffer);
-        printf("%c", readChar(lexer));
-        fread(buffer, 1, 5, lexer->fp);
-        buffer[5] = '\0';
-        printf(" << %s\n", buffer);
-
-    } else {
-        rewind(lexer->fp);
-        fread(buffer, 1, pos, lexer->fp);
-        buffer[pos] = '\0';
-        printf(">>> %s >> ", buffer);
-        printf("%c", readChar(lexer));
-        fread(buffer, 1, 10 - pos, lexer->fp);
-        buffer[10 - pos] = '\0';
-        printf(" << %s\n ", buffer);
-    }
-
-    restorePos(lexer);
 }
 
+void error(struct Lexer *lexer, enum ErrorType err) {
+    error_with_lineno(lexer, err, -1);
+}
 
 // Complex Eating Function
 
@@ -305,6 +315,9 @@ bool eatInt(struct Lexer *lexer, struct TokenInfo *info) {
             err = hex2int(lexer->ch, &n);
         } else {
             err = char2int(lexer->ch, &n);
+            if (base == 8 && lexer->ch <= '9' && lexer->ch >= '8') {
+                err = INVALID_OCT_NUMBER;
+            }
         }
         if (err != NO_ERROR) {
             error(lexer, err);
@@ -622,6 +635,61 @@ bool eatDiv(struct Lexer *lexer, struct TokenInfo *info) {
     return false;
 }
 
+bool eatSingleComment(struct Lexer *lexer, struct TokenInfo *info) {
+#ifdef _DEBUG_
+    printf("eatSingleComment\n");
+#endif
+    if (eatChar(lexer, '/')) {
+        if (eatChar(lexer, '/')) {
+            info->type = COMMENT;
+            eatToNewLine(lexer);
+            return true;
+        } else {
+            spitChar(lexer);
+        }
+    }
+    return false;
+}
+
+void eatToCommentEnd(struct Lexer *lexer) {
+    bool hasEnd = false;
+    long lineno = lexer->lineno;
+    while (readChar(lexer)) {
+        if (lexer->ch == '\n') {
+            ++lexer->lineno;
+        } else if (lexer->ch == '*') {
+            if (readChar(lexer) == '/') {
+                hasEnd = true;
+                break;
+            }
+        } else if (lexer->ch == '/') {
+            if (readChar(lexer) == '*') {
+                error(lexer, WRAPPED_COMMENT);
+            }
+        }
+    }
+    if (!hasEnd) {
+        error_with_lineno(lexer, COMMENT_NOT_CLOSED, lineno);
+    }
+}
+
+bool eatCommentStart(struct Lexer *lexer, struct TokenInfo *info) {
+#ifdef _DEBUG_
+    printf("eatCommentStart\n");
+#endif
+    if (eatChar(lexer, '/')) {
+        if (eatChar(lexer, '*')) {
+            info->type = COMMENT;
+            eatToCommentEnd(lexer);
+            return true;
+        } else {
+            spitChar(lexer);
+        }
+    }
+    return false;
+}
+
+
 bool eatAnd(struct Lexer *lexer, struct TokenInfo *info) {
 #ifdef _DEBUG_
     printf("eatAnd\n");
@@ -908,6 +976,8 @@ void outputToken(struct TokenInfo token) {
         printf("%s: %f", TokenStr[token.type], token.val.floatVal);
     } else if (token.type == ID) {
         printf("%s: %s", TokenStr[token.type], token.val.strVal);
+    } else if (token.type == COMMENT) {
+        printf("%s", TokenStr[token.type]);
     } else {
         printf("%s: %s", TokenStr[token.type], token.val.desp);
     }
@@ -918,7 +988,9 @@ struct TokenInfo eatToken(struct Lexer *lexer) {
     struct TokenInfo info;
     lexer->has_error = false;
 
-    if (eatFloat(lexer, &info)) {
+    if (eatSingleComment(lexer, &info)) {
+    } else if (eatCommentStart(lexer, &info)) {
+    } else if (eatFloat(lexer, &info)) {
     } else if (eatInt(lexer, &info)) {
     } else if (eatSemi(lexer, &info)) {
     } else if (eatComma(lexer, &info)) {
@@ -956,6 +1028,9 @@ struct TokenInfo eatToken(struct Lexer *lexer) {
 }
 
 void lex(struct Lexer *lexer) {
+
+    resetLexer(lexer);
+
     struct TokenInfo info;
     while (lexer->state != FINISHED) {
         int n = eatSpaces(lexer);
