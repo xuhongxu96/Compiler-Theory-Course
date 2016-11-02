@@ -53,13 +53,13 @@ ExtDef: Specifier ExtDecList SEMI { $$ = newast2(makeTextVal("ExtDef"), $1, $2);
     |error SEMI { yyerrok; }
     ;
 ExtDecList: VarDec { $$ = newast1(makeTextVal("ExtDecList"), $1); }
-    |VarDec COMMA ExtDecList { $$ = newast2(makeTextVal("ExtDecList"), $1, $2); }
+    |VarDec COMMA ExtDecList { $$ = newast2(makeTextVal("ExtDecList"), $1, $3); }
     ;
 Specifier: TYPE { $$ = newast1(makeTextVal("Specifier Type"), $1); }
     |StructSpecifier { $$ = newast1(makeTextVal("Specifier Struct"), $1); }
     ;
-StructSpecifier: STRUCT OptTag LC DefList RC { $$ = newast2(makeTextVal("StructSpecifier"), $1, $2); }
-    |STRUCT Tag { $$ = newast1(makeTextVal("StructSpecifier"), $1); }
+StructSpecifier: STRUCT OptTag LC DefList RC { $$ = newast2(makeTextVal("StructSpecifier"), $2, $4); }
+    |STRUCT Tag { $$ = newast1(makeTextVal("StructSpecifier"), $2); }
     ;
 OptTag: { $$ = newast(0, makeTextVal("OptTag")); }
     |ID { $$ = newast1(makeTextVal("OptTag"), $1); }
