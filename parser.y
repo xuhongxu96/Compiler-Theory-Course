@@ -1,12 +1,14 @@
 %{
 #include <stdio.h>
 #include <string.h>
-#include "common.h"
+#include "tree.h"
+#include "symbol.h"
 
-extern int yylineno;
 
 int yylex();
-void yyerror(char *);
+extern int yylineno;
+void yyerror(const char *);
+void yyerror2(const char *, const char *);
 
 %}
 
@@ -41,6 +43,9 @@ void yyerror(char *);
 Program:ExtDefList { 
     $$ = newast1(makeTextVal("Program"), $1);
     tracetree($$, 0);
+    printf("\n");
+    initSymTable();
+    semantic($$);
     freetree($$);
 }
     ;
@@ -78,6 +83,7 @@ VarList: ParamDec COMMA VarList { $$ = newast2(makeTextVal("VarList"), $1, $3); 
 ParamDec: Specifier VarDec { $$ = newast2(makeTextVal("ParamDec"), $1, $2); }
     ;
 CompSt: LC DefList StmtList RC { $$ = newast2(makeTextVal("CompSt"), $2, $3); }
+    |error RC {yyerrok;}
     ;
 StmtList: { $$ = newast(0, makeTextVal("StmtList")); }
     |Stmt StmtList { $$ = newast2(makeTextVal("StmtList"), $1, $2); }
@@ -117,6 +123,7 @@ Exp: Exp ASSIGNOP Exp { $$ = newast2(makeTextVal("Exp Assign"), $1, $3); }
     |ID { $$ = newast1(makeTextVal("Exp ID"), $1); }
     |INT { $$ = newast1(makeTextVal("Exp Int"), $1); }
     |FLOAT { $$ = newast1(makeTextVal("Exp Float"), $1); }
+    |error RP {yyerrok;}
     ;
 Args: Exp COMMA Args { $$ = newast2(makeTextVal("Args"), $1, $3); }
     |Exp { $$ = newast1(makeTextVal("Args"), $1); }
@@ -128,99 +135,12 @@ int main() {
     yyparse();
 }
 
-void yyerror(char *msg) {
+void yyerror(const char *msg) {
     fprintf(stderr,"Error Type B at line %d: %s\n", yylineno, msg);
 }
 
-struct ast *newast(int size, union Value v) {
-    struct ast *AST = (struct ast *) malloc(sizeof(struct ast));
-    if (!AST) {
-        fprintf(stderr, "Error Type C at line %d: No Memory Space.", yylineno);
-    }
-
-    AST->val = v;
-    AST->size = size;
-    AST->type = -1;
-
-    return AST;
+void yyerror2(const char *type, const char *msg) {
+    fprintf(stderr,"Error Type %s at line %d: %s\n", type, yylineno, msg);
 }
 
-struct ast *newast1(union Value v, struct ast *a) {
-    struct ast *AST = newast(1, v);
-    AST->childs[0] = a;
 
-    return AST;
-}
-
-struct ast *newast2(union Value v, struct ast *a, struct ast *b) {
-    struct ast *AST = newast(2, v);
-    AST->childs[0] = a;
-    AST->childs[1] = b;
-
-    return AST;
-}
-
-struct ast *newast3(union Value v, struct ast *a, struct ast *b, struct ast *c) {
-    struct ast *AST = newast(3, v);
-    AST->childs[0] = a;
-    AST->childs[1] = b;
-    AST->childs[2] = c;
-
-    return AST;
-}
-
-union Value makeTextVal(const char *s) {
-    union Value v;
-    strcpy(v.text, s);
-    return v;
-}
-
-union Value makeIntVal(int i) {
-    union Value v;
-    v.n = i;
-    return v;
-}
-
-union Value makeFloatVal(float f) {
-    union Value v;
-    v.f = f;
-    return v;
-}
-
-void freetree(struct ast *t) {
-    int n = t->size;
-    for (int i = 0; i < n; ++i) {
-        freetree(t->childs[i]);
-    }
-    free(t);
-}
-
-void tracetree(struct ast *t, int l) {
-    for (int i = 0; i < l; ++i) {
-        printf("  ");
-    }
-    if (t == NULL) {
-        printf("null\n");
-        return;
-    }
-    int n = t->size;
-    if (t->type == INT) {
-        printf("%d\n", t->val.n);
-    } else if (t->type == FLOAT) {
-        printf("%f\n", t->val.f);
-    } else {
-        printf("%s\n", t->val.text);
-    }
-    for (int i = 0; i < n; ++i) {
-        tracetree(t->childs[i], l + 1);
-    }
-    if (n == 0 && t->type == -1) {
-        tracetree(NULL, l + 1);
-    }
-}
-
-struct ast *newastTK(union Value v, int tk) {
-    struct ast *AST = newast(0, v);
-    AST->type = tk;
-    return AST;
-}

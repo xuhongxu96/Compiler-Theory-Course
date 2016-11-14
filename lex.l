@@ -1,6 +1,6 @@
 %{
 #include"parser.tab.h"
-#include "common.h"
+#include "tree.h"
 
 extern union YYSTYPE yylval;
 

@@ -1,3 +1,4 @@
+#pragma once
 
 union Value {
     char text[256];
@@ -10,6 +11,7 @@ struct ast {
     int type;
     struct ast *childs[10];
     int size;
+    int lineno;
 };
 
 struct ast *newastTK(union Value v, int tk);
