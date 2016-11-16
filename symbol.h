@@ -10,11 +10,28 @@ enum SymType {
 
 struct SymNode {
     enum SymType symtype;
+    struct SymNode *parent;
     struct SymNode *type;
     char name[255];
     int size;
     int lineno;
     struct SymNode *next;
+    bool param;
+};
+
+struct FunNode {
+    char name[255];
+    struct SymNode *ret;
+    int size;
+    struct SymNode *param;
+    struct FunNode *next;
+    int lineno;
+};
+
+struct ExpType {
+    bool isLeftVal;
+    struct SymNode *leftVal;
+    struct SymNode *prop;
 };
 
 

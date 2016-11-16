@@ -108,6 +108,7 @@ Dec: VarDec { $$ = newast1(makeTextVal("Dec"), $1);}
     ;
 Exp: Exp ASSIGNOP Exp { $$ = newast2(makeTextVal("Exp Assign"), $1, $3); }
     |Exp AND Exp { $$ = newast2(makeTextVal("Exp And"), $1, $3); }
+    |Exp OR Exp { $$ = newast2(makeTextVal("Exp Or"), $1, $3); }
     |Exp RELOP Exp { $$ = newast3(makeTextVal("Exp Relop"), $1, $2, $3); }
     |Exp PLUS Exp { $$ = newast2(makeTextVal("Exp Plus"), $1, $3); }
     |Exp MINUS Exp { $$ = newast2(makeTextVal("Exp Minus"), $1, $3); }
