@@ -50,7 +50,7 @@ SPACE [ \n\t]
 "//".*\n { }
 
 {SEMI} {
-    yylval.a = newastTK(makeTextVal(yytext), SEMI);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("SEMI: %s\n", yytext);
     #endif
@@ -66,7 +66,7 @@ SPACE [ \n\t]
 }
 
 {COMMA} {
-    yylval.a = newastTK(makeTextVal(yytext), COMMA);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("COMMA: %s\n", yytext);
     #endif
@@ -74,7 +74,7 @@ SPACE [ \n\t]
 }
 
 {ASSIGNOP} {
-    yylval.a = newastTK(makeTextVal(yytext), ASSIGNOP);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("ASSIGNOP: %s\n", yytext);
     #endif
@@ -98,7 +98,7 @@ SPACE [ \n\t]
 }
 
 {PLUS}	{
-    yylval.a = newastTK(makeTextVal(yytext), PLUS);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("PLUS: %s\n", yytext);
     #endif
@@ -106,7 +106,7 @@ SPACE [ \n\t]
 }
 
 {MINUS} {
-    yylval.a = newastTK(makeTextVal(yytext), MINUS);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("MINUS: %s\n", yytext);
     #endif
@@ -114,7 +114,7 @@ SPACE [ \n\t]
 }
 
 {DIV} {
-    yylval.a = newastTK(makeTextVal(yytext), DIV);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("DIV: %s\n", yytext);
     #endif
@@ -122,7 +122,7 @@ SPACE [ \n\t]
 }
 
 {STAR} {
-    yylval.a = newastTK(makeTextVal(yytext), STAR);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("STAR: %s\n", yytext);
     #endif
@@ -138,7 +138,7 @@ SPACE [ \n\t]
 }
 
 {AND} {
-    yylval.a = newastTK(makeTextVal(yytext), AND);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("AND: %s\n", yytext);
     #endif
@@ -146,7 +146,7 @@ SPACE [ \n\t]
 }
 
 {OR} {
-    yylval.a = newastTK(makeTextVal(yytext), OR);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("OR: %s\n", yytext);
     #endif
@@ -154,7 +154,7 @@ SPACE [ \n\t]
 }
 
 {NOT} {
-    yylval.a = newastTK(makeTextVal(yytext), NOT);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("NOT: %s\n", yytext);
     #endif
@@ -162,7 +162,7 @@ SPACE [ \n\t]
 }
 
 {DOT} {
-    yylval.a = newastTK(makeTextVal(yytext), DOT);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("DOT: %s\n", yytext);
     #endif
@@ -170,7 +170,7 @@ SPACE [ \n\t]
 }
 
 {STRUCT} {
-    yylval.a = newastTK(makeTextVal(yytext), STRUCT);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("STRUCT: %s\n", yytext);
     #endif
@@ -178,7 +178,7 @@ SPACE [ \n\t]
 }
 
 {RETURN} {
-    yylval.a = newastTK(makeTextVal(yytext), RETURN);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("RETURN: %s\n", yytext);
     #endif
@@ -186,7 +186,7 @@ SPACE [ \n\t]
 }
 
 {IF}  {
-    yylval.a = newastTK(makeTextVal(yytext), IF);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("IF: %s\n", yytext);
     #endif
@@ -194,7 +194,7 @@ SPACE [ \n\t]
 }
 
 {ELSE}	{
-    yylval.a = newastTK(makeTextVal(yytext), ELSE);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("ELSE: %s\n", yytext);
     #endif
@@ -202,7 +202,7 @@ SPACE [ \n\t]
 }
  
 {WHILE} {
-    yylval.a = newastTK(makeTextVal(yytext), WHILE);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("WHILE: %s\n", yytext);
     #endif
@@ -210,7 +210,7 @@ SPACE [ \n\t]
 }
 
 {LP} {
-    yylval.a = newastTK(makeTextVal(yytext), LP);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("LP: %s\n", yytext);
     #endif
@@ -218,7 +218,7 @@ SPACE [ \n\t]
 }
 
 {RP} {
-    yylval.a = newastTK(makeTextVal(yytext), RP);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("RP: %s\n", yytext);
     #endif
@@ -226,7 +226,7 @@ SPACE [ \n\t]
 }
 
 {LB} {
-    yylval.a = newastTK(makeTextVal(yytext), LB);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("LB: %s\n", yytext);
     #endif
@@ -234,7 +234,7 @@ SPACE [ \n\t]
 }
 
 {RB} {
-    yylval.a = newastTK(makeTextVal(yytext), RB);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("RB: %s\n", yytext);
     #endif
@@ -242,7 +242,7 @@ SPACE [ \n\t]
 }
 
 {LC} {
-    yylval.a = newastTK(makeTextVal(yytext), LC);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("LC: %s\n", yytext);
     #endif
@@ -250,7 +250,7 @@ SPACE [ \n\t]
 }
 
 {RC} {
-    yylval.a = newastTK(makeTextVal(yytext), RC);
+    yylval.a = NULL;
     #ifdef DEBUG
     printf("RC: %s\n", yytext);
     #endif

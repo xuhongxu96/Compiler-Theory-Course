@@ -36,6 +36,7 @@ struct ExpType {
 
 
 void initSymTable();
+struct SymNode *createSymNode(enum SymType symtype, struct SymNode *type, const char *name, struct SymNode *next, int lineno, struct SymNode *parent);
 struct SymNode *lookupSym(struct SymNode *n, const char *s);
 void semantic(struct ast *t);
 void traceSymbol(struct SymNode *, int, bool, bool);

@@ -12,6 +12,9 @@ void yyerror2(const char *, const char *);
 
 %}
 
+%define parse.lac full
+%define parse.error verbose
+
 
 %union {
     struct ast *a;
@@ -44,7 +47,6 @@ Program:ExtDefList {
     $$ = newast1(makeTextVal("Program"), $1);
     tracetree($$, 0);
     printf("\n");
-    initSymTable();
     semantic($$);
     freetree($$);
 }
@@ -119,7 +121,7 @@ Exp: Exp ASSIGNOP Exp { $$ = newast2(makeTextVal("Exp Assign"), $1, $3); }
     |NOT Exp { $$ = newast1(makeTextVal("Exp Not"), $2); }
     |ID LP Args RP { $$ = newast2(makeTextVal("Exp Call"), $1, $3); }
     |ID LP RP { $$ = newast1(makeTextVal("Exp Call"), $1); }
-    |Exp LB Exp RB { $$ = newast2(makeTextVal("Exp Array"), $1, $2); }
+    |Exp LB Exp RB { $$ = newast2(makeTextVal("Exp Array"), $1, $3); }
     |Exp DOT ID { $$ = newast2(makeTextVal("Exp Dot"), $1, $3); }
     |ID { $$ = newast1(makeTextVal("Exp ID"), $1); }
     |INT { $$ = newast1(makeTextVal("Exp Int"), $1); }
