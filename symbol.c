@@ -21,11 +21,11 @@ struct SymNode *createSymNode(enum SymType symtype, struct SymNode *type, const 
     struct SymNode *temp;
     int lerrno = 3;
     if (symtype == S_STRUCT) lerrno = 16;
-    if (!inStruct && (temp = lookupSym(propTable, name))) {
+    if (temp = lookupSym(propTable, name)) {
         fprintf(stderr, "Error Type %d at line %d: The struct '%s' has been already defined at line %d.\n", lerrno, lineno,  name, temp->lineno);
         return NULL;
     }
-    if (!inStruct && (temp = lookupSym(varTable, name))) {
+    if (temp = lookupSym(varTable, name)) {
         fprintf(stderr, "Error Type %d at line %d: The variable '%s' has been already defined at line %d.\n", lerrno, lineno,  name, temp->lineno);
         return NULL;
     }
@@ -125,22 +125,22 @@ struct SymNode *addTableItem(struct SymNode **table, struct SymNode *n) {
 
 void addProp(struct SymNode *n) {
     if (!n) return;
-#ifdef DEBUG
-    printf("== New Prop: %s\n", n->name);
-#endif
     addTableItem(&propTable, n);
 }
 
 void addVar(struct SymNode *n) {
     if (!n) return;
-#ifdef DEBUG
-    printf("== New Var: %s\n", n->name);
-#endif
     addTableItem(&varTable, n);
 }
 
 bool istype(struct ast *t, const char *type) {
     if (t == NULL) return false;
+#ifdef DEBUG
+    if (strcmp(t->val.text, type) == 0) {
+        printf("%s", type);
+        printf("\n");
+    }
+#endif
     return strcmp(t->val.text, type) == 0;
 }
 
@@ -173,37 +173,36 @@ struct SymNode *lookupStruct(struct SymNode *p, const char *f) {
     return NULL;
 }
 
-bool sym_args(struct FunNode *f, struct ast *t, int ith) {
+bool sym_args(struct ast *t, struct SymNode *n) {
     bool ret = true;
     if (istype(t, "Args")) {
+#ifdef DEBUG
+        printSymbol(n);
+#endif
         struct ExpType type;
         if (t->size == 2) {
             // Exp COMMA Args
             type = sym_exp(t->childs[0]);
-            ret = sym_args(f, t->childs[1], ith + 1);
+            ret = sym_args(t->childs[1], n->next);
         } else if (t->size == 1) {
             // Exp
             type = sym_exp(t->childs[0]);
-        }
-        struct SymNode *curParam = f->param;
-        for (int i = 0; i < ith; ++i) {
-            if (curParam) {
-                curParam = curParam->next;
-            } else {
-                break;
+            if (n->next != NULL) {
+                fprintf(stderr, "Error Type 9 at line %d: Function lacks params.\n", t->lineno);
+                return false;
             }
         }
-        if (curParam == NULL) {
-            fprintf(stderr, "Error Type 9 at line %d: Function needs %d params.\n", t->lineno, f->size);
+        if (n == NULL) {
+            fprintf(stderr, "Error Type 9 at line %d: Function needs params '%s'.\n", t->lineno, n->name);
             return false;
         }
-        if (type.prop == curParam->type) {
+        if (type.prop == n->type) {
             return ret;
         } else {
-            if (curParam->type && type.prop) {
-                fprintf(stderr, "Error Type 9 at line %d: Unmatched type of %dth param (needs '%s', but provided '%s').\n", t->lineno, ith + 1, curParam->type->name, type.prop->name);
+            if (n->type && type.prop) {
+                fprintf(stderr, "Error Type 9 at line %d: Unmatched type of param '%s' (needs '%s', but provided '%s').\n", t->lineno, n->name, n->type->name, type.prop->name);
             } else {
-                fprintf(stderr, "Error Type 9 at line %d: Unmatched type of %dth param.\n", t->lineno, ith + 1);
+                fprintf(stderr, "Error Type 9 at line %d: Unmatched type of param '%s'.\n", t->lineno, n->name);
             }
             return false;
         }
@@ -281,22 +280,22 @@ struct ExpType sym_exp(struct ast *t) {
             struct FunNode *f = lookupFunc(t->childs[0]->val.text);
             if (!f) {
                 if (lookupSym(varTable, t->childs[0]->val.text)) {
-                    fprintf(stderr, "Error Type 11 at line %d: %s is not a function.\n", t->lineno, t->childs[0]->val.text);
+                    fprintf(stderr, "Error Type 11 at line %d: '%s' is not a function.\n", t->lineno, t->childs[0]->val.text);
                 } else {
-                    fprintf(stderr, "Error Type 2 at line %d: Function undefined.\n", t->lineno);
+                    fprintf(stderr, "Error Type 2 at line %d: Function '%s' undefined.\n", t->lineno, t->childs[0]->val.text);
                 }
                 return initExpType(NULL, NULL);
             }
-            sym_args(f, t->childs[1], 0);
+            sym_args(t->childs[1], f->param);
             return initExpType(NULL, f->ret);
         } else if (t->size == 1) {
             // ID LP RP
             struct FunNode *f = lookupFunc(t->childs[0]->val.text);
             if (!f) {
                 if (lookupSym(varTable, t->childs[0]->val.text)) {
-                    fprintf(stderr, "Error Type 11 at line %d: %s is not a function.\n", t->lineno, t->childs[0]->val.text);
+                    fprintf(stderr, "Error Type 11 at line %d: '%s' is not a function.\n", t->lineno, t->childs[0]->val.text);
                 } else {
-                    fprintf(stderr, "Error Type 2 at line %d: Function undefined.\n", t->lineno);
+                    fprintf(stderr, "Error Type 2 at line %d: Function '%s' undefined.\n", t->lineno, t->childs[0]->val.text);
                 }
                 return initExpType(NULL, NULL);
             }
@@ -512,13 +511,14 @@ void sym_ext_dec_list(struct SymNode *type, struct ast *t) {
 }
 
 struct FunNode *createFunNode(const char *name, struct SymNode *ret, int size, struct SymNode *param, int lineno) {
+    struct FunNode *f = (struct FunNode *) malloc(sizeof(struct FunNode));
     struct FunNode *temp;
     if (temp = lookupFunc(name)) {
         fprintf(stderr, "Error Type 4 at line %d: The function '%s' has been already defined at line %d.\n", lineno,  name, temp->lineno);
-        return NULL;
+        f->name[0] = '\0';
+    } else {
+        strcpy(f->name, name);
     }
-    struct FunNode *f = (struct FunNode *) malloc(sizeof(struct FunNode));
-    strcpy(f->name, name);
     f->ret = ret;
     f->size = size;
     f->param = param;
@@ -642,10 +642,6 @@ bool sym_ext_def(struct ast *t) {
             // Specifier FunDec CompSt
             struct SymNode *ret = sym_specifier(t->childs[0]);
             struct FunNode *f = sym_fun_dec(t->childs[1]);
-            if (!f) {
-                cleanSymNode(ret);
-                return false;
-            }
             f->ret = ret;
             addFunc(f);
             curFunc = f;
