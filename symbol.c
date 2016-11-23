@@ -32,9 +32,7 @@ struct SymNode *createSymNode(enum SymType symtype, struct SymNode *type, const 
     struct SymNode *n = (struct SymNode *) malloc(sizeof(struct SymNode));
     n->symtype = symtype;
     n->type = type;
-    if (name) {
-        strcpy(n->name, name);
-    }
+    strcpy(n->name, name);
     n->size = 0;
     n->next = next;
     n->lineno = lineno;
@@ -97,9 +95,10 @@ struct FunNode *lookupFunc(const char *s) {
 }
 
 struct SymNode *lookupSym(struct SymNode *n, const char *s) {
+    if (!s) return NULL;
     struct SymNode *p = n;
     while (p != NULL) {
-        if (strcmp(p->name, s) == 0) {
+        if (p->name && strcmp(p->name, s) == 0) {
             return p;
         }
         p = p->next;
@@ -488,6 +487,7 @@ struct SymNode *sym_var_dec(struct SymNode *type, struct ast *t) {
         } else if (t->size == 2) {
             // VarDec LB INT RB
             struct SymNode *n = sym_var_dec(type, t->childs[0]);
+            if (!n) return NULL;
             struct SymNode *ret = createSymNode(S_ARRAY, n, n->name, NULL, t->childs[0]->lineno, NULL);
             n->parent = ret;
             ret->size = t->childs[1]->val.n;
