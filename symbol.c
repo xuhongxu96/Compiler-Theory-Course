@@ -3,6 +3,7 @@
 #include <string.h>
 #include "symbol.h"
 #include "parser.tab.h"
+#include "trans.h"
 
 
 extern int yylineno;
@@ -12,20 +13,26 @@ void yyerror2(const char *type, const char *msg);
 struct SymNode *propTable = NULL, *varTable = NULL;
 struct FunNode *funcTable = NULL;
 
+struct FloatNode *flconst = NULL, *fltail = NULL; 
+
 struct FunNode *curFunc = NULL;
 bool inStruct = false;
 
 char stype[][10] = {"int", "float", "struct", "var", "array", "field"};
+
+bool err = false;
 
 struct SymNode *createSymNode(enum SymType symtype, struct SymNode *type, const char *name, struct SymNode *next, int lineno, struct SymNode *parent) {
     struct SymNode *temp;
     int lerrno = 3;
     if (symtype == S_STRUCT) lerrno = 16;
     if (temp = lookupSym(propTable, name)) {
+        err = true;
         fprintf(stderr, "Error Type %d at line %d: The struct '%s' has been already defined at line %d.\n", lerrno, lineno,  name, temp->lineno);
         return NULL;
     }
     if (temp = lookupSym(varTable, name)) {
+        err = true;
         fprintf(stderr, "Error Type %d at line %d: The variable '%s' has been already defined at line %d.\n", lerrno, lineno,  name, temp->lineno);
         return NULL;
     }
@@ -172,7 +179,7 @@ struct SymNode *lookupStruct(struct SymNode *p, const char *f) {
     return NULL;
 }
 
-bool sym_args(struct ast *t, struct SymNode *n) {
+bool sym_args(struct ast *t, struct SymNode *n, struct FunNode *f, int lv) {
     bool ret = true;
     if (istype(t, "Args")) {
 #ifdef DEBUG
@@ -182,16 +189,18 @@ bool sym_args(struct ast *t, struct SymNode *n) {
         if (t->size == 2) {
             // Exp COMMA Args
             type = sym_exp(t->childs[0]);
-            ret = sym_args(t->childs[1], n->next);
+            ret = sym_args(t->childs[1], n->next, f, lv + 1);
         } else if (t->size == 1) {
             // Exp
             type = sym_exp(t->childs[0]);
-            if (n->next != NULL) {
+            if (lv < f->size) {
+                err = true;
                 fprintf(stderr, "Error Type 9 at line %d: Function lacks params.\n", t->lineno);
                 return false;
             }
         }
         if (n == NULL) {
+            err = true;
             fprintf(stderr, "Error Type 9 at line %d: Function needs params '%s'.\n", t->lineno, n->name);
             return false;
         }
@@ -199,8 +208,10 @@ bool sym_args(struct ast *t, struct SymNode *n) {
             return ret;
         } else {
             if (n->type && type.prop) {
+                err = true;
                 fprintf(stderr, "Error Type 9 at line %d: Unmatched type of param '%s' (needs '%s', but provided '%s').\n", t->lineno, n->name, n->type->name, type.prop->name);
             } else {
+                err = true;
                 fprintf(stderr, "Error Type 9 at line %d: Unmatched type of param '%s'.\n", t->lineno, n->name);
             }
             return false;
@@ -213,20 +224,24 @@ struct ExpType sym_exp(struct ast *t) {
         // Exp ASSIGNOP Exp
         struct ExpType type = sym_exp(t->childs[0]);
         if (!type.isLeftVal) {
+            err = true;
             fprintf(stderr, "Error Type 6 at line %d: Assigned to a right value.\n", t->lineno);
             return initExpType(NULL, NULL);
         }
         struct ExpType type2 = sym_exp(t->childs[1]);
         if (type.prop != type2.prop) {
-            char n1[256], n2[256];
-            strcpy(n1, type.prop->name);
-            strcpy(n2, type2.prop->name);
-            if (type.prop->parent && type.prop->parent->symtype == S_ARRAY) {
+            char n1[256] = "", n2[256] = "";
+            if (type.prop)
+                strcpy(n1, type.prop->name);
+            if (type2.prop)
+                strcpy(n2, type2.prop->name);
+            if (type.prop && type.prop->parent && type.prop->parent->symtype == S_ARRAY) {
                 strcat(n1, "*");
             }
-            if (type2.prop->parent && type2.prop->symtype == S_ARRAY) {
+            if (type2.prop && type2.prop->parent && type2.prop->symtype == S_ARRAY) {
                 strcat(n2, "*");
             }
+            err = true;
             fprintf(stderr, "Error Type 5 at line %d: Unmatched type '%s' and '%s'.\n", t->lineno, n1, n2);
             return initExpType(NULL, NULL);
         }
@@ -237,20 +252,24 @@ struct ExpType sym_exp(struct ast *t) {
         struct ExpType type = sym_exp(t->childs[0]);
         struct ExpType type2 = sym_exp(t->childs[1]);
         if (type.prop->symtype != S_INT || type2.prop->symtype != S_INT) {
+            err = true;
             fprintf(stderr, "Error Type 7 at line %d: Boolean operator can only be applied to int values.\n", t->lineno);
             return initExpType(NULL, NULL);
         }
         return initExpType(NULL, type.prop);
-    } else if (istype(t, "Exp Relop")
+    } else if (istype(t, "Exp Relop") 
             || istype(t, "Exp Plus")
             || istype(t, "Exp Minus")
             || istype(t, "Exp Star")
             || istype(t, "Exp Div")) {
         // Exp xxx Exp
         struct ExpType type = sym_exp(t->childs[0]);
-        struct ExpType type2 = sym_exp(t->childs[1]);
+        int index = 1;
+        if (istype(t, "Exp Relop")) index = 2;
+        struct ExpType type2 = sym_exp(t->childs[index]);
         if (type.prop != type2.prop || (type.prop->symtype != S_INT && type.prop->symtype != S_FLOAT)) {
-            fprintf(stderr, "Error Type 7 at line %d: Arithmetical operator can only be applied to int or float values.\n", t->lineno);
+            err = true;
+            fprintf(stderr, "Error Type 7 at line %d: Arithmetical operator can only be applied to int or float values, not '%s' and '%s'.\n", t->lineno, type.prop->name, type2.prop->name);
             return initExpType(NULL, NULL);
         }
         return initExpType(NULL, type.prop);
@@ -261,6 +280,7 @@ struct ExpType sym_exp(struct ast *t) {
         // MINUS Exp
         struct ExpType type = sym_exp(t->childs[0]);
         if (type.prop->symtype != S_INT && type.prop->symtype != S_FLOAT) {
+            err = true;
             fprintf(stderr, "Error Type 7 at line %d: Arithmetical operator can only be applied to int or float values.\n", t->lineno);
             return initExpType(NULL, NULL);
         }
@@ -269,6 +289,7 @@ struct ExpType sym_exp(struct ast *t) {
         // NOT Exp
         struct ExpType type = sym_exp(t->childs[0]);
         if (type.prop->symtype != S_INT) {
+            err = true;
             fprintf(stderr, "Error Type 7 at line %d: Boolean operator can only be applied to int values.\n", t->lineno);
             return initExpType(NULL, NULL);
         }
@@ -279,26 +300,31 @@ struct ExpType sym_exp(struct ast *t) {
             struct FunNode *f = lookupFunc(t->childs[0]->val.text);
             if (!f) {
                 if (lookupSym(varTable, t->childs[0]->val.text)) {
+                    err = true;
                     fprintf(stderr, "Error Type 11 at line %d: '%s' is not a function.\n", t->lineno, t->childs[0]->val.text);
                 } else {
+                    err = true;
                     fprintf(stderr, "Error Type 2 at line %d: Function '%s' undefined.\n", t->lineno, t->childs[0]->val.text);
                 }
                 return initExpType(NULL, NULL);
             }
-            sym_args(t->childs[1], f->param);
+            sym_args(t->childs[1], f->param, f, 1);
             return initExpType(NULL, f->ret);
         } else if (t->size == 1) {
             // ID LP RP
             struct FunNode *f = lookupFunc(t->childs[0]->val.text);
             if (!f) {
                 if (lookupSym(varTable, t->childs[0]->val.text)) {
+                    err = true;
                     fprintf(stderr, "Error Type 11 at line %d: '%s' is not a function.\n", t->lineno, t->childs[0]->val.text);
                 } else {
+                    err = true;
                     fprintf(stderr, "Error Type 2 at line %d: Function '%s' undefined.\n", t->lineno, t->childs[0]->val.text);
                 }
                 return initExpType(NULL, NULL);
             }
             if (f->size != 0) {
+                err = true;
                 fprintf(stderr, "Error Type 9 at line %d: Function needs %d params.\n", t->lineno, f->size);
                 return initExpType(NULL, f->ret);
             }
@@ -309,11 +335,13 @@ struct ExpType sym_exp(struct ast *t) {
         // Exp LB Exp RB
         struct ExpType type1 = sym_exp(t->childs[0]);
         if (type1.leftVal == NULL || type1.leftVal->symtype != S_ARRAY) {
+            err = true;
             fprintf(stderr, "Error Type 10 at line %d: '[]' must be used for an array.\n", t->lineno);
             return initExpType(NULL, NULL);
         }
         struct ExpType type2 = sym_exp(t->childs[1]);
         if (type2.prop == NULL || type2.prop->symtype != S_INT) {
+            err = true;
             fprintf(stderr, "Error Type 12 at line %d: Index of array must be an int value.\n", t->lineno);
             return initExpType(type1.leftVal->type, type1.leftVal->type->type);
         }
@@ -321,12 +349,14 @@ struct ExpType sym_exp(struct ast *t) {
     } else if (istype(t, "Exp Dot")) {
         // Exp DOT ID
         struct ExpType type = sym_exp(t->childs[0]);
-        if (type.prop->symtype != S_STRUCT) {
+        if (type.prop == NULL || type.prop->symtype != S_STRUCT) {
+            err = true;
             fprintf(stderr, "Error Type 13 at line %d: '.' applied to a non-struct variable.\n", t->lineno);
             return initExpType(NULL, NULL);
         }
         struct SymNode *field = lookupStruct(type.prop, t->childs[1]->val.text);
         if (!field) {
+            err = true;
             fprintf(stderr, "Error Type 14 at line %d: struct field '%s' is undefined.\n", t->lineno, t->childs[1]->val.text);
             return initExpType(NULL, NULL);
         }
@@ -335,6 +365,7 @@ struct ExpType sym_exp(struct ast *t) {
         // ID
         struct SymNode *n = lookupSym(varTable, t->childs[0]->val.text);
         if (!n) {
+            err = true;
             fprintf(stderr, "Error Type 1 at line %d: Undefined variable '%s'.\n", t->lineno,  t->childs[0]->val.text);
             return initExpType(NULL, NULL);
         }
@@ -342,6 +373,15 @@ struct ExpType sym_exp(struct ast *t) {
     } else if (istype(t, "Exp Int")) {
         return initExpType(NULL, lookupSym(propTable, "int"));
     } else if (istype(t, "Exp Float")) {
+        struct FloatNode *fl = (struct FloatNode *) malloc(sizeof(struct FloatNode));
+        fl->v = t->childs[0]->val.f;
+        fl->n = NULL;
+        if (fltail) {
+            fltail->n = fl;
+            fltail = fl;
+        } else {
+            fltail = flconst = fl;
+        }
         return initExpType(NULL, lookupSym(propTable, "float"));
     }
 }
@@ -354,12 +394,14 @@ struct SymNode *sym_dec(struct SymNode *type, struct ast *t) {
         } else if (t->size == 2) {
             // VarDec ASSIGNOP Exp
             if (inStruct) {
+                err = true;
                 fprintf(stderr, "Error Type 15 at line %d: Assignment in struct.\n", t->lineno);
                 return NULL;
             }
             struct SymNode *n = sym_var_dec(type, t->childs[0]);
             struct ExpType exptype = sym_exp(t->childs[1]);
             if (exptype.prop != n->type) {
+                err = true;
                 fprintf(stderr, "Error Type 5 at line %d: Unmatched type '%s' and '%s'.\n", t->lineno, exptype.prop->name, n->type->name);
                 cleanSymNode(n);
                 return NULL;
@@ -377,8 +419,9 @@ struct SymNode *sym_dec_list(struct SymNode *type, struct ast *t) {
         } else if (t->size == 2) {
             // Dec COMMA DecList
             struct SymNode *n = sym_dec_list(type, t->childs[1]);
-            addTableItem(&n, sym_dec(type, t->childs[0]));
-            return n;
+            struct SymNode *n2 = sym_dec(type, t->childs[0]);
+            addTableItem(&n2, n);
+            return n2;
         }
     }
     return NULL;
@@ -400,10 +443,8 @@ struct SymNode *sym_def_list(struct ast *t) {
             // Def DefList
             struct SymNode *n = sym_def(t->childs[0]);
             struct SymNode *n2 = sym_def_list(t->childs[1]);
-            if (n2) {
-                addTableItem(&n, n2);
-            }
-            return n;
+                addTableItem(&n2, n);
+            return n2;
         }
     }
     return NULL;
@@ -427,6 +468,7 @@ bool checkDup(struct SymNode *n) {
         p2 = p1->next;
         while (p2 != NULL) {
             if (strcmp(p1->name, p2->name) == 0) {
+                err = true;
                 fprintf(stderr, "Error Type 15 at line %d: Duplicated struct member '%s' at line %d.\n", p1->lineno, p1->name, p2->lineno);
                 ret = true;
             }
@@ -443,6 +485,7 @@ struct SymNode *sym_struct_specifier(struct ast *t) {
             // STRUCT Tag
             struct SymNode *n = lookupSym(propTable, t->childs[0]->childs[0]->val.text);
             if (!n) {
+                err = true;
                 fprintf(stderr, "Error Type 17 at line %d: Undefined struct '%s'.\n", t->lineno,  t->childs[0]->childs[0]->val.text);
                 return NULL;
             }
@@ -514,6 +557,7 @@ struct FunNode *createFunNode(const char *name, struct SymNode *ret, int size, s
     struct FunNode *f = (struct FunNode *) malloc(sizeof(struct FunNode));
     struct FunNode *temp;
     if (temp = lookupFunc(name)) {
+        err = true;
         fprintf(stderr, "Error Type 4 at line %d: The function '%s' has been already defined at line %d.\n", lineno,  name, temp->lineno);
         f->name[0] = '\0';
     } else {
@@ -545,8 +589,8 @@ struct SymNode *sym_var_list(struct ast *t, int *ct) {
             struct SymNode *n = sym_param_dec(t->childs[0]);
             struct SymNode *n2 = sym_var_list(t->childs[1], &l);
             *ct = l + 1;
-            addTableItem(&n, n2);
-            return n;
+            addTableItem(&n2, n);
+            return n2;
         } else if (t->size == 1) {
             // ParamDec
             *ct = 1;
@@ -583,12 +627,14 @@ void sym_stmt(struct ast *t) {
         // RETURN Exp SEMI
         struct ExpType type = sym_exp(t->childs[0]);
         if (curFunc->ret != type.prop) {
+            err = true;
             fprintf(stderr, "Error Type 8 at line %d: Return type unmatched.\n", t->lineno);
         }
     } else if (istype(t, "Stmt If")) {
         // IF LP Exp RP Stmt
         struct ExpType type = sym_exp(t->childs[0]);
         if (type.prop->symtype != S_INT) {
+            err = true;
             fprintf(stderr, "Error Type 7 at line %d: If condition must be int value.\n", t->lineno);
         }
         sym_stmt(t->childs[1]);
@@ -596,6 +642,7 @@ void sym_stmt(struct ast *t) {
         // IF LP Exp RP Stmt ELSE Stmt
         struct ExpType type = sym_exp(t->childs[0]);
         if (type.prop->symtype != S_INT) {
+            err = true;
             fprintf(stderr, "Error Type 7 at line %d: If condition must be int value.\n", t->lineno);
         }
         sym_stmt(t->childs[1]);
@@ -604,6 +651,7 @@ void sym_stmt(struct ast *t) {
         // WHILE LP Exp RP Stmt
         struct ExpType type = sym_exp(t->childs[0]);
         if (type.prop->symtype != S_INT) {
+            err = true;
             fprintf(stderr, "Error Type 7 at line %d: If condition must be int value.\n", t->lineno);
         }
         sym_stmt(t->childs[1]);
@@ -731,6 +779,15 @@ void _semantic(struct ast *t) {
     sym_program(t);
 }
 
+void cleanFloatNode() {
+    struct FloatNode *p = flconst;
+    while (p) {
+        struct FloatNode *t = p;
+        p = p->n;
+        free(t);
+    }
+}
+
 void semantic(struct ast *t) {
     initSymTable();
     _semantic(t);
@@ -742,7 +799,11 @@ void semantic(struct ast *t) {
     printf("\n\n=== Func ===\n\n");
     traceFunc(funcTable);
 
+    if (!err)
+        translate(t);
+
     cleanVar();
     cleanProp();
     cleanFunNode(funcTable);
+    cleanFloatNode();
 }

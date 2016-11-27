@@ -1,60 +1,31 @@
-int ggg()
-{
-    qq;
-    g();
-    return 1;
-}
-struct test{
-    int a,z;
-    float c,d;
+int a; 
 
-};
-int f(float q,int w)
-{
-    int gg=0;
-    int gg;
-    return 0;
+struct A {
+    int b;
+    float c;
+}x;
+
+struct B {
+    struct A in_a;
+} ab;
+
+float d;
+
+int add(int t1, int t2) {
+    return t1 + t2;
 }
-int f()
-{
-    gg=1.5;
-    10=gg;
-    10.2+gg;
-    return 1.1; 
-}
-int hh()
-{
-    f(1);
-    return 0;
-}
-int main()
-{
-    int i;
-    i[0];
-    i(10);
-    return 0;
-}
-int hgj()
-{
-    int j[10];
-    j[1.5];
-    i.a;
-    return 0;
-}
-int uyt()
-{
-    struct test zzz;
-    zzz.n;
-    return 1;
-}
-struct yy{
-    int uu=1;
-};
-struct i{
-    int ll;
-};
-int iyy()
-{
-    struct position bb;
-    return 0;
+
+int main() {
+    int haha = 3 + 2;
+    struct A y;
+    ab.in_a.b = 3;
+    a = 0;
+    d = 12.1;
+    d = 3.4;
+    x.b = a + 2; // x.b = 2
+    x.c = -d; // x.c = 3.4
+    y = x; // y.b = 2, y.c = 3.4
+    y.b = add(a, 3); // y.b = 3
+    a = a == 0; // a = 1
+    return a; // return 0
 }

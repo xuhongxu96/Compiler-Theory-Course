@@ -12,7 +12,6 @@ void yyerror2(const char *, const char *);
 
 %}
 
-%define parse.lac full
 %define parse.error verbose
 
 

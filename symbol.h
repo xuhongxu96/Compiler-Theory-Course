@@ -35,9 +35,21 @@ struct ExpType {
 };
 
 
+extern struct SymNode *propTable, *varTable;
+extern struct FunNode *funcTable;
+struct FloatNode {
+    float v;
+    struct FloatNode *n;
+};
+extern struct FloatNode *flconst, *fltail;
+
+bool istype(struct ast *t, const char *type);
 void initSymTable();
 struct SymNode *createSymNode(enum SymType symtype, struct SymNode *type, const char *name, struct SymNode *next, int lineno, struct SymNode *parent);
 struct SymNode *lookupSym(struct SymNode *n, const char *s);
 void semantic(struct ast *t);
 void traceSymbol(struct SymNode *, int, bool, bool);
 void printSymbol(struct SymNode *);
+struct ExpType initExpType(struct SymNode *leftVal, struct SymNode *prop);
+struct SymNode *lookupStruct(struct SymNode *p, const char *f);
+struct FunNode *lookupFunc(const char *s);
