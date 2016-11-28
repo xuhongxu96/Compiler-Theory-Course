@@ -406,6 +406,9 @@ struct SymNode *sym_dec(struct SymNode *type, struct ast *t) {
                 cleanSymNode(n);
                 return NULL;
             }
+            if (!inStruct) {
+                addVar(n);
+            }
             return n;
         }
     }
@@ -443,7 +446,9 @@ struct SymNode *sym_def_list(struct ast *t) {
             // Def DefList
             struct SymNode *n = sym_def(t->childs[0]);
             struct SymNode *n2 = sym_def_list(t->childs[1]);
+            if (inStruct) {
                 addTableItem(&n2, n);
+            }
             return n2;
         }
     }
@@ -672,7 +677,6 @@ void sym_comp_st(struct ast *t) {
     if (istype(t, "CompSt")) {
         // LC DefList StmtList RC
         struct SymNode *n = sym_def_list(t->childs[0]);
-        addVar(n);
         sym_stmt_list(t->childs[1]);
     }
 }

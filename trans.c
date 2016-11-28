@@ -39,7 +39,8 @@ void trans_args(struct ast *t, struct SymNode *param) {
         printf("mov\t[_%s], eax\n", param->name);
     } else if (desp.reg == XMM0) {
         printf("lea\tesp, [esp-4]\n");
-        printf("movss\t[esp], [_%s]\n", param->name);
+        printf("movss\txmm1, [_%s]\n", param->name);
+        printf("movss\t[esp], xmm1\n");
         printf("movss\t[_%s], xmm0\n", param->name);
     }
     if (t->size == 2) {
@@ -335,9 +336,9 @@ void trans_stmt(struct ast *t) {
         int i = 0;
         while (p) {
             if (p->type->symtype == S_INT) {
-                sprintf(cur_pop_str, "mov\tebx, [ebp+%d]\nmov\t[_%s], ebx\n", i * 8 + 8, p->name);
+                sprintf(cur_pop_str, "mov\tebx, [ebp+%d]\nmov\t[_%s], ebx\n", i * 4 + 8, p->name);
             } else if (p->type->symtype == S_FLOAT) {
-                sprintf(cur_pop_str, "movss\txmm1, [ebp+%d]\nmovss\t[_%s], xmm1\n", i * 8 + 8, p->name);
+                sprintf(cur_pop_str, "movss\txmm1, [ebp+%d]\nmovss\t[_%s], xmm1\n", i * 4 + 8, p->name);
                 i++;
             }
             strcat(cur_pop_str, pop_str);
@@ -408,8 +409,12 @@ void trans_dec(struct ast *t) {
     } else if (t->size == 2) {
         // VarDec ASSIGNOP Exp
         struct SymNode *id = trans_var_dec(t->childs[0]);
-        trans_exp(t->childs[1], true);
-        printf("mov\t[_%s], eax\n", id->name);
+        struct ExpDesp desp = trans_exp(t->childs[1], true);
+        if (desp.reg == EAX) {
+            printf("mov\t[_%s], eax\n", id->name);
+        } else if (desp.reg == XMM0) {
+            printf("movss\t[_%s], xmm0\n", id->name);
+        }
     }
 }
 
