@@ -390,7 +390,11 @@ struct SymNode *sym_dec(struct SymNode *type, struct ast *t) {
     if (istype(t, "Dec")) {
         if (t->size == 1) {
             // VarDec
-            return sym_var_dec(type, t->childs[0]);
+            struct SymNode *n = sym_var_dec(type, t->childs[0]);
+            if (!inStruct) {
+                addVar(n);
+            }
+            return n;
         } else if (t->size == 2) {
             // VarDec ASSIGNOP Exp
             if (inStruct) {

@@ -352,7 +352,9 @@ void trans_stmt(struct ast *t) {
         printf("ret\n");
     } else if (istype(t, "Stmt If")) {
         // IF LP Exp RP Stmt
-        static int if_ct = 0;
+        static int g_if_ct = 0;
+        int if_ct = g_if_ct;
+        g_if_ct++;
         trans_exp(t->childs[0], true);
         printf("cmp\teax, 0\n");
         printf("je\t__ifend_%d\n", if_ct);
@@ -361,19 +363,28 @@ void trans_stmt(struct ast *t) {
         if_ct++;
     } else if (istype(t, "Stmt IfElse")) {
         // IF LP Exp RP Stmt ELSE Stmt
-        static int ife_ct = 0;
+        static int g_ife_ct = 0;
+        int ife_ct = g_ife_ct;
+        g_ife_ct++;
+        printf("; IF %d condition BEGIN {\n", ife_ct);
         trans_exp(t->childs[0], true);
+        printf("; } IF %d condition END\n", ife_ct);
         printf("cmp\teax, 0\n");
         printf("je\t__ife_else_%d\n", ife_ct);
+        printf("; IF %d true BEGIN {\n", ife_ct);
         trans_stmt(t->childs[1]);
-        printf("jmp\t__ife_end_%d:\n", ife_ct);
+        printf("; } IF %d true END\n", ife_ct);
+        printf("jmp\t__ife_end_%d\n", ife_ct);
         printf("__ife_else_%d:\n", ife_ct);
+        printf("; IF %d false BEGIN {\n", ife_ct);
         trans_stmt(t->childs[2]);
+        printf("; } IF %d false END\n", ife_ct);
         printf("__ife_end_%d:\n", ife_ct);
-        ife_ct++;
     } else if (istype(t, "Stmt While")) {
         // WHILE LP Exp RP Stmt
-        static int while_ct = 0;
+        static int g_while_ct = 0;
+        int while_ct = g_while_ct;
+        g_while_ct++;
         printf("__while_%d:\n", while_ct);
         trans_exp(t->childs[0], true);
         printf("cmp\teax, 0\n");
